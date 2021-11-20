@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import IntEnum
 from typing import List
 
 import ssl
@@ -16,32 +17,72 @@ class XMLWritable:
     def write(self, root : ET.Element) -> ET.Element: raise NotImplementedError() 
 
 class ParseHelper: 
-    def parse_interval(row : str) -> ZInterval: 
-        if 'free ride' in row: return ZFreeRide.parse(row) 
-        if 'from' in row and 'to' in row: return ZRangedInterval.parse(row)
-        if ',' in row: return ZIntervalsSet.parse(row)
-        return ZInterval.parse(row)
-    def parse_ftp_power(row : str):
-        if not '%' in row: return row
-        power, _ = row.split('%')
-        return power 
+    def parse_interval(row : str) -> ZSteadyState: 
+        if 'free ride' in row: return ZFreeRide.parse(row) #10min free ride 
+        if 'from' in row and 'to' in row: return ZRangedInterval.parse(row) #1min from 50 to 90% FTP
+        if 'x' in row: return ZIntervalsT.parse(row) #10x 3min @ 100% FTP, 1min @ 55% FTP
+        return ZSteadyState.parse(row) #3min @ 100rpmm, 95% FTP
+    
+    def parse_cadence(row: str) -> int:
+        if 'rpm,' not in row: return -1, row 
+        cadence, rest = row.split('rpm,')
+        return int(cadence), rest 
 
-class ZWorkoutFile: 
-    def __init__(self, **kwargs) -> None:
+    def parse_power(row: str) -> int:
+        power = row 
+        if '%' in power: power, _ = power.split('%')
+        return float(power)/100
+
+    def parse_duration(row: str) -> int: 
+        seconds = 0 
+        if 'hr' in row: 
+            hr, row = row.split('hr') 
+            seconds += int(hr) * 3600 
+        if 'min' in row: 
+            min, row = row.split('min')
+            seconds += int(min) * 60 
+        if 'sec' in row: 
+            sec, _ = row.split('sec')
+            seconds += int(sec)
+        return seconds
+
+class ZWorkoutFile(XMLWritable): 
+    def __init__(self, workout : ZWorkout, **kwargs) -> None:
         def get(key, default): return kwargs[key] if key in kwargs else default
 
+        self.workout = workout 
         self.author = get('author', 'Zwift Parser')
         self.name = get('name', 'Zwift Workout')
-        self.descr = get('descr', 'Parsed Zwift Workout')
+        self.description = get('description', 'Parsed Zwift Workout')
         self.sport_type = get('sport_type', 'bike')
         self.tags = get('tags', '')
-        pass
+        self.lookup = {
+            'author': self.author,
+            'name': self.name,
+            'description': self.description,
+            'sport_type': self.sport_type,
+        }
+
+    def __getitem__(self, key): return self.lookup[key]
+
+    def write(self, root : ET.Element = None) -> ET.Element:
+        root = ET.Element('workout_file')
+        for k,v in self.lookup.items(): 
+            print(k,v)
+            ET.SubElement(root, k).text = v
+        tags = ET.SubElement(root, 'tags')
+        for t in tags: 
+            tag = ET.SubElement(tags, 'tag')
+            tag.set('name', t)
+
+        self.workout.write(root)
+        return root 
 
 class ZWorkout(Parsable, XMLWritable): 
     def parse(rows : List[str]) -> ZWorkout: 
         return ZWorkout([ParseHelper.parse_interval(r) for r in rows])
 
-    def __init__(self, intervals : List[ZInterval]) -> None:
+    def __init__(self, intervals : List[ZSteadyState]) -> None:
         self.intervals = intervals
         
     def __repr__(self) -> str:
@@ -49,59 +90,124 @@ class ZWorkout(Parsable, XMLWritable):
         return f"ZWorkout [{intervals_str}]"
 
     def write(self, root : ET.Element) -> ET.Element: 
-        root = ET.Element("workout_file")
+        workout = ET.SubElement(root, 'workout')
+        for i in self.intervals: i.write(workout)
+        return workout 
 
-        pass 
+class ZSteadyState(Parsable, XMLWritable): 
+    def parse(row : str) -> ZSteadyState:
+        duration, row = [r.strip() for r in row.split('@')]
+        duration = ParseHelper.parse_duration(duration)
+        cadence, row = ParseHelper.parse_cadence(row)
+        return ZSteadyState(duration, ParseHelper.parse_power(row), cadence)
 
-class ZInterval(Parsable): 
-    def parse(row : str) -> ZInterval:
-        duration, power = [r.strip() for r in row.split('@')]
-        return ZInterval(duration, ParseHelper.parse_ftp_power(power))
-
-    def __init__(self, duration, power) -> None:
+    def __init__(self, duration, power, cadence = -1) -> None:
         self.duration = duration 
         self.power = power 
+        self.cadence = cadence 
 
     def __repr__(self) -> str:
-        return f'ZInterval(duration: {self.duration} power: {self.power}'
+        return f'SteadyState (duration: {self.duration} power: {self.power} cadence: {self.cadence}'
 
-class ZRangedInterval(ZInterval): 
-    def parse(row : str) -> ZRangedInterval: 
-        duration, rest = row.split('from')
-        from_power, to_power = [ParseHelper.parse_ftp_power(p) for p in rest.split('to')]
-        return ZRangedInterval(duration, from_power, to_power)
+    def write(self, root: ET.Element) -> ET.Element:
+        interval = ET.SubElement(root, 'SteadyState')
+        interval.set('Duration', str(self.duration))
+        interval.set('Power', str(self.power))
+        if self.cadence > 0: interval.set('Cadence', str(self.cadence))
+        return interval 
 
-    def __init__(self, duration, from_power, to_power) -> None:
+#Warmup and Cooldown items 
+class ZRangedInterval(ZSteadyState): 
+    def parse(row : str) -> ZRangedInterval:                 
+        duration, row = row.split('from')
+        cadence = -1
+        if '@' in duration: 
+            duration, cadence = duration.split('@')
+            cadence, _ = ParseHelper.parse_cadence(cadence)
+        duration = ParseHelper.parse_duration(duration)
+
+        from_power, to_power = [ParseHelper.parse_power(p) for p in row.split('to')]
+        if from_power < to_power: return ZWarmup(duration, from_power, to_power, cadence)
+        
+        else: return ZCooldown(duration, from_power, to_power, cadence)
+
+    def __init__(self, duration, from_power, to_power, cadence = -1) -> None:
         self.duration = duration 
         self.from_power = from_power 
         self.to_power = to_power 
+        self.cadence = cadence
 
     def __repr__(self) -> str:
-        return f'ZRangedInterval (duration: {self.duration} from_power: {self.from_power} to_power: {self.to_power})'
+        return f'{self.get_name()} (duration: {self.duration} from_power: {self.from_power} to_power: {self.to_power} cadence: {self.cadence})'
 
-class ZIntervalsSet(ZInterval): 
-    def parse(row : str) -> ZIntervalsSet: 
+    def get_name(self) -> str: 
+        return "ZRangedInterval"
+
+    def write(self, root: ET.Element) -> ET.Element:
+        name = self.get_name()#'Warmup' if self.from_power < self.to_power else 'Cooldown'
+        interval = ET.SubElement(root, name)
+        interval.set('Duration', str(self.duration))
+        interval.set('PowerLow', str(self.from_power))
+        interval.set("PowerHigh", str(self.to_power))
+        if self.cadence > 0: interval.set('Cadence', str(self.cadence))
+
+class ZWarmup(ZRangedInterval): 
+    def get_name(self) -> str:
+        return "Warmup"
+
+class ZCooldown(ZRangedInterval): 
+    def get_name(self) -> str:
+        return "Cooldown"
+
+class ZIntervalsT(ZSteadyState): 
+    def parse(row : str) -> ZIntervalsT: 
         number, rest =  row.split('x')
-        first_interval, second_interval = [ZInterval.parse(r) for r in rest.split(',')]
-        return ZIntervalsSet(number, first_interval, second_interval)
+        first_interval, second_interval = [ZSteadyState.parse(r) for r in rest.split(',')]
+        return ZIntervalsT(number, first_interval, second_interval)
 
-    def __init__(self, number, first_interval : ZInterval, second_interval : ZInterval) -> None:
+    def __init__(self, number, first_interval : ZSteadyState, second_interval : ZSteadyState) -> None:
         self.number = number
         self.first_interval = first_interval 
         self.second_interval = second_interval 
 
     def __repr__(self) -> str:
-        return f'ZIntervalSet ({self.number} x {self.first_interval}, {self.second_interval})'
+        return f'IntervalT ({self.number} x {self.first_interval}, {self.second_interval})'
 
-class ZFreeRide(ZInterval): 
-    def parse(row : str) -> ZFreeRide: 
+    def write(self, root: ET.Element) -> ET.Element:
+        interval = ET.SubElement(root, 'IntervalT')
+        interval.set('Repeat', str(self.number))
+        interval.set('OnDuration', str(self.first_interval.duration))
+        interval.set('OffDuration', str(self.second_interval.duration))
+        interval.set("OnPower", str(self.first_interval.power))
+        interval.set('OffPower', str(self.second_interval.power))
+        interval.set('Cadence', str(self.first_interval.cadence))
+        interval.set("CadenceResting", str(self.second_interval.cadence))
         pass 
 
-    def __init__(self, duration) -> None:
+class ZFreeRide(ZSteadyState): 
+    def parse(row : str) -> ZFreeRide: 
+        duration, _ = row.split('free ride')
+        cadence = -1
+        if '@' in duration: 
+            duration, cadence = duration.split("@")
+            cadence = ParseHelper.parse_cadence(cadence)
+        duration = ParseHelper.parse_duration(duration)
+        return ZFreeRide(duration, cadence)
+        
+    def __init__(self, duration, cadence = -1, flat_road = 1) -> None:
         self.duration = duration
+        self.cadence = cadence
+        self.flat_road = flat_road
 
     def __repr__(self) -> str:
-        return f'ZFreeRide ({self.duration} free ride)'
+        return f'ZFreeRide (duration: {self.duration} cadence: {self.cadence})'
+
+    def write(self, root: ET.Element) -> ET.Element:
+        interval = ET.SubElement(root, 'FreeRide')
+        interval.set('Duration', str(self.duration))
+        if self.cadence > 0: interval.set("Cadence", str(self.cadence))
+        interval.set('FlatRoad', str(self.flat_road))
+        pass 
 
 def parse_workout_row(row):
     #we need two variants of parsing, one for absolute watts and another one for FTP 
@@ -129,7 +235,9 @@ def purify_workout_data(data : element.Tag):
     return workout
 
 #move to params 
-url = "https://whatsonzwift.com/workouts/gran-fondo/week-2-1-long-tempo-intervals"
+# url = "https://whatsonzwift.com/workouts/gran-fondo/week-2-1-long-tempo-intervals"
+url = "https://whatsonzwift.com/workouts/mattias-thyr-unstructured-workouts/szrgwo-021-"
+# url = "https://whatsonzwift.com/workouts/gcn-zero-to-hero-plan/week-1-initial-testing-7-sat-or-sun-free-ride"
 
 #move to file 
 headers = {
@@ -140,6 +248,7 @@ headers = {
     'Accept-Language': 'en-US,en;q=0.8',
     'Connection': 'keep-alive'
 }
+ 
 
 context = ssl.create_default_context(cafile=certifi.where())
 req = request.Request(url, headers=headers)
@@ -147,12 +256,32 @@ response = request.urlopen(req, context=context)
 content = response.read().decode('utf-8')
 soup = BeautifulSoup(content, features='html.parser')
 
+breadcrumbs = [item.string.strip() for item in soup.select_one('div.breadcrumbs')] 
+breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
+filename = breadcrumbs.pop(-1)
+
 workout_data = soup.select_one('div.one-third.column.workoutlist')
 pure_workout_data = purify_workout_data(workout_data) 
 parsed_workout = ZWorkout.parse(pure_workout_data)
-print(parsed_workout)
 
-data = ET.Element("root")
+workout_overview = soup.select_one('div.overview')
+workout_author = 'Zwift Workouts Parser'
+workout_desc = workout_overview.next_sibling
+if 'Author' in workout_overview.next_sibling.string:
+    workout_author = workout_overview.next_sibling
+    workout_desc = workout_author.next_sibling
 
-with open("test.zwo", 'wb') as f: 
-    f.write(ET.tostring(data))
+if 'Author' in workout_author.string: _, workout_author = workout_author.string.split('Author:')
+workout_desc = workout_desc.get_text("\n")
+
+workout_file = ZWorkoutFile(parsed_workout, 
+                            name=filename, author=workout_author.strip(), description=workout_desc) 
+data = workout_file.write()
+text = ET.tostring(data)
+pretty_text = BeautifulSoup(text, 'xml')
+
+#TODO: Remove XML declaration at the top of exported file 
+#TODO: Fix the order of attributes in the exported file 
+
+with open(f"{filename}.zwo", 'wb') as f: 
+    f.write(pretty_text.prettify().encode("utf-8"))
