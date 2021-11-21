@@ -1,14 +1,8 @@
 from __future__ import annotations
-from enum import IntEnum
 from typing import List
 
-import ssl
-from urllib import request
-import certifi
-import ssl 
 from bs4 import BeautifulSoup, element
 import xml.etree.ElementTree as ET 
-import numpy as np
 
 class Parsable: 
     def parse(row : str) -> Parsable: raise NotImplementedError() 
@@ -116,7 +110,6 @@ class ZSteadyState(Parsable, XMLWritable):
         if self.cadence > 0: interval.set('Cadence', str(self.cadence))
         return interval 
 
-#Warmup and Cooldown items 
 class ZRangedInterval(ZSteadyState): 
     def parse(row : str) -> ZRangedInterval:                 
         duration, row = row.split('from')
@@ -174,7 +167,7 @@ class ZIntervalsT(ZSteadyState):
         return f'IntervalT ({self.number} x {self.first_interval}, {self.second_interval})'
 
     def write(self, root: ET.Element) -> ET.Element:
-        interval = ET.SubElement(root, 'IntervalT')
+        interval = ET.SubElement(root, 'IntervalsT')
         interval.set('Repeat', str(self.number))
         interval.set('OnDuration', str(self.first_interval.duration))
         interval.set('OffDuration', str(self.second_interval.duration))
@@ -205,8 +198,8 @@ class ZFreeRide(ZSteadyState):
     def write(self, root: ET.Element) -> ET.Element:
         interval = ET.SubElement(root, 'FreeRide')
         interval.set('Duration', str(self.duration))
-        if self.cadence > 0: interval.set("Cadence", str(self.cadence))
         interval.set('FlatRoad', str(self.flat_road))
+        if self.cadence > 0: interval.set("Cadence", str(self.cadence))
         pass 
 
 def parse_workout_row(row):
@@ -235,8 +228,8 @@ def purify_workout_data(data : element.Tag):
     return workout
 
 #move to params 
-# url = "https://whatsonzwift.com/workouts/gran-fondo/week-2-1-long-tempo-intervals"
-url = "https://whatsonzwift.com/workouts/mattias-thyr-unstructured-workouts/szrgwo-021-"
+url = "https://whatsonzwift.com/workouts/gran-fondo/week-2-1-long-tempo-intervals"
+# url = "https://whatsonzwift.com/workouts/mattias-thyr-unstructured-workouts/szrgwo-021-"
 # url = "https://whatsonzwift.com/workouts/gcn-zero-to-hero-plan/week-1-initial-testing-7-sat-or-sun-free-ride"
 
 #move to file 
@@ -248,8 +241,10 @@ headers = {
     'Accept-Language': 'en-US,en;q=0.8',
     'Connection': 'keep-alive'
 }
- 
 
+import ssl
+from urllib import request
+import certifi
 context = ssl.create_default_context(cafile=certifi.where())
 req = request.Request(url, headers=headers)
 response = request.urlopen(req, context=context)
@@ -259,6 +254,7 @@ soup = BeautifulSoup(content, features='html.parser')
 breadcrumbs = [item.string.strip() for item in soup.select_one('div.breadcrumbs')] 
 breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
 filename = breadcrumbs.pop(-1)
+directory = 'export/' + '/'.join(breadcrumbs)
 
 workout_data = soup.select_one('div.one-third.column.workoutlist')
 pure_workout_data = purify_workout_data(workout_data) 
@@ -271,17 +267,21 @@ if 'Author' in workout_overview.next_sibling.string:
     workout_author = workout_overview.next_sibling
     workout_desc = workout_author.next_sibling
 
-if 'Author' in workout_author.string: _, workout_author = workout_author.string.split('Author:')
+if not isinstance(workout_author, str) and 'Author' in workout_author.string: 
+    _, workout_author = workout_author.string.split('Author:')
 workout_desc = workout_desc.get_text("\n")
 
 workout_file = ZWorkoutFile(parsed_workout, 
                             name=filename, author=workout_author.strip(), description=workout_desc) 
 data = workout_file.write()
 text = ET.tostring(data)
-pretty_text = BeautifulSoup(text, 'xml')
+xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
+pretty_text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
+pretty_text = pretty_text.replace(xml_header, b'').strip()
 
-#TODO: Remove XML declaration at the top of exported file 
-#TODO: Fix the order of attributes in the exported file 
+from os import path, makedirs
+if not path.isdir(directory): makedirs(directory)
 
-with open(f"{filename}.zwo", 'wb') as f: 
-    f.write(pretty_text.prettify().encode("utf-8"))
+from utility import slugify
+with open(f"{directory}/{slugify(filename, True)}.zwo", 'wb') as f: 
+    f.write(pretty_text)
