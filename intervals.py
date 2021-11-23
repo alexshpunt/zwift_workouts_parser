@@ -2,7 +2,6 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET 
 from interfaces import *
 
-
 class ParseHelper: 
     def parse_interval(row : str) -> ZSteadyState: 
         if 'free ride' in row: return ZFreeRide.parse(row) #10min free ride 
@@ -11,8 +10,12 @@ class ParseHelper:
         return ZSteadyState.parse(row) #3min @ 100rpmm, 95% FTP
     
     def parse_cadence(row: str) -> int:
-        if 'rpm,' not in row: return -1, row 
-        cadence, rest = row.split('rpm,')
+        keyword = 'rpm'
+
+        if keyword not in row: return -1, row 
+        if ',' in row: keyword += ','
+
+        cadence, rest = row.split(keyword)
         return int(cadence), rest 
 
     def parse_power(row: str) -> int:
@@ -32,7 +35,6 @@ class ParseHelper:
             sec, _ = row.split('sec')
             seconds += int(sec)
         return seconds
-
 
 class ZSteadyState(Parsable, XMLWritable): 
     def parse(row : str) -> ZSteadyState:
@@ -101,6 +103,7 @@ class ZCooldown(ZRangedInterval):
 class ZIntervalsT(ZSteadyState): 
     def parse(row : str) -> ZIntervalsT: 
         number, rest =  row.split('x')
+        rest = rest.replace("rpm,", 'rpm')
         first_interval, second_interval = [ZSteadyState.parse(r) for r in rest.split(',')]
         return ZIntervalsT(number, first_interval, second_interval)
 

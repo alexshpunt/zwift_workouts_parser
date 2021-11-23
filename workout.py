@@ -25,7 +25,6 @@ class ZWorkoutFile(XMLWritable):
     def write(self, root : ET.Element = None) -> ET.Element:
         root = ET.Element('workout_file')
         for k,v in self.lookup.items(): 
-            print(k,v)
             ET.SubElement(root, k).text = v
         tags = ET.SubElement(root, 'tags')
         for t in tags: 
