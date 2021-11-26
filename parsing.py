@@ -17,8 +17,10 @@ def parse_workout(article: element.Tag) -> Dict:
     breadcrumbs = [item.string.strip() for item in article.select_one('div.breadcrumbs')] 
     breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
     filename = breadcrumbs.pop(-1)
-    directory = 'export/' + '/'.join(breadcrumbs)
+    directory = '/'.join(breadcrumbs)
     
+    print(f"Parsing {directory}/{filename}")
+
     workout_data = article.select_one('div.one-third.column.workoutlist')
     pure_workout_data = purify_workout_data(workout_data) 
 
@@ -58,17 +60,33 @@ def get_workout_data(url):
     workouts = soup.find_all('article', class_ = 'workout')
     return workouts
 
-def save_workout(url): 
-    workouts = get_workout_data(url)
+def save_plan(plan_url, export_dir): 
+    print(f"Saving plan by {plan_url}")
+    workouts = get_workout_data(plan_url)
+    from tqdm import tqdm
 
+    for workout in tqdm(workouts):
+        save_workout(workout, export_dir)
+
+def save_workout(workout, export_dir): 
     def unpack(directory, filename, text): return directory, filename, text
-    for workout in workouts: 
-        directory, filename, text = unpack(**parse_workout(workout))
-        print(directory, filename)
+    directory, filename, text = unpack(**parse_workout(workout))
+    directory = f"{export_dir}/{directory}"
 
-        from os import path, makedirs
-        if not path.isdir(directory): makedirs(directory)
+    from os import path, makedirs
+    if not path.isdir(directory): makedirs(directory)
 
-        from utility import slugify
-        with open(f"{directory}/{slugify(filename, True)}.zwo", 'wb') as f: 
-            f.write(text)
+    from utility import slugify
+    with open(f"{directory}/{slugify(filename, True)}.zwo", 'wb') as f: 
+        f.write(text)
+
+def parse_plans(url, export_dir): 
+    content = get_web_content(url)
+    soup = BeautifulSoup(content, features='html.parser')
+    plans = soup.find_all('div', class_ = 'card')
+    for plan in plans: 
+        sport = "".join([i for i in plan.find('div', class_='card-sports').i['class'] if 'bike' in i])
+        if not sport: continue
+        plan_url = plan.find('a', class_='button')['href']
+        if 'ftp-tests' in plan_url: continue
+        save_plan(plan_url, export_dir)
