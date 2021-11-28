@@ -4,7 +4,10 @@ from webhelper import get_web_content
 from typing import Dict
 
 def convert_to_string(data: element.NavigableString):
+    output = [] 
     for content in data.contents:
+        if isinstance(content, str): 
+            output.append(content)
         pass 
 
 def purify_workout_data(data : element.Tag): 
