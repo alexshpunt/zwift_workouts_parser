@@ -36,6 +36,7 @@ class ZWorkoutFile(XMLWritable):
 
 class ZWorkout(Parsable, XMLWritable): 
     def parse(rows : List[str]) -> ZWorkout: 
+        print(rows)
         return ZWorkout([ParseHelper.parse_interval(r) for r in rows])
 
     def __init__(self, intervals : List[ZSteadyState]) -> None:

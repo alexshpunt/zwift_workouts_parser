@@ -1,0 +1,9 @@
+TODO: Fix plan lists parsing 
+TODO: Added a way to force %FTP to be shown instead of Watts 
+TODO: Make a class out of the parser 
+TODO: Reorganize and refactor everything
+TODO: Add command line commands 
+TODO: Make a build and upload it as a release 
+TODO: Make an archive with all exported workouts and upload it as a release 
+TODO: Write a small wiki about how everything should be set up 
+TODO: Write doccumentation for the classes 

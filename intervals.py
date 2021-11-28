@@ -38,6 +38,7 @@ class ParseHelper:
 
 class ZSteadyState(Parsable, XMLWritable): 
     def parse(row : str) -> ZSteadyState:
+        print(f"Try to parse {row} as Steady State")
         duration, row = [r.strip() for r in row.split('@')]
         duration = ParseHelper.parse_duration(duration)
         cadence, row = ParseHelper.parse_cadence(row)
@@ -60,6 +61,7 @@ class ZSteadyState(Parsable, XMLWritable):
 
 class ZRangedInterval(ZSteadyState): 
     def parse(row : str) -> ZRangedInterval:                 
+        print(f"Try to parse {row} as Ranged Interval")
         duration, row = row.split('from')
         cadence = -1
         if '@' in duration: 
@@ -102,6 +104,7 @@ class ZCooldown(ZRangedInterval):
 
 class ZIntervalsT(ZSteadyState): 
     def parse(row : str) -> ZIntervalsT: 
+        print(f"Try to parse {row} as Intervals")
         number, rest =  row.split('x')
         rest = rest.replace("rpm,", 'rpm')
         first_interval, second_interval = [ZSteadyState.parse(r) for r in rest.split(',')]
@@ -128,6 +131,7 @@ class ZIntervalsT(ZSteadyState):
 
 class ZFreeRide(ZSteadyState): 
     def parse(row : str) -> ZFreeRide: 
+        print(f"Try to parse {row} as free ride")
         duration, _ = row.split('free ride')
         cadence = -1
         if '@' in duration: 

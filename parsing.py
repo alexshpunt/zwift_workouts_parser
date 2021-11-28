@@ -3,12 +3,18 @@ from bs4 import BeautifulSoup, element
 from webhelper import get_web_content
 from typing import Dict
 
+def convert_to_string(data: element.NavigableString):
+    for content in data.contents:
+        pass 
+
 def purify_workout_data(data : element.Tag): 
     workout = []
     for row in data.find_all('div'):
         workout_set = [] 
         for content in row.contents: 
-            if isinstance(content, element.Tag): workout_set.append("".join(content.contents)) 
+            if isinstance(content, element.Tag): 
+                print(f"--- {content} xxx {content.contents}")
+                workout_set.append("".join(content.contents)) #We have an issue here, seems like because of the <br> tag  
             else: workout_set.append(content)
         workout.append("".join(workout_set))
     return workout
@@ -71,11 +77,11 @@ def save_plan(plan_url, export_dir):
 def save_workout(workout, export_dir): 
     directory, filename = get_meta_data(workout)
     if not directory or not filename: return #We can't really parse it, if there is some issue with the meta data
-    try:
-        text = parse_workout(workout, filename)
-    except Exception as e:
-        print(f"Wasn't able to parse {directory}/{filename} because of {e} exception")
-        return
+    text = parse_workout(workout, filename)
+    #try:
+    #except Exception as e:
+    #    print(f"Wasn't able to parse {directory}/{filename} because of {e} exception")
+    #    return
    
     from utility import slugify
     directory = f"{export_dir}/{slugify(directory)}"
@@ -94,4 +100,5 @@ def parse_plans(url, export_dir):
         sport = "".join([i for i in plan.find('div', class_='card-sports').i['class'] if 'bike' in i])
         if not sport: continue
         plan_url = plan.find('a', class_='button')['href']
+        if 'ftp-test' in plan_url: continue
         save_plan(plan_url, export_dir)
