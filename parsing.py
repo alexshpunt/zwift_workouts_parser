@@ -13,14 +13,7 @@ def purify_workout_data(data : element.Tag):
         workout.append("".join(workout_set))
     return workout
 
-def parse_workout(article: element.Tag) -> Dict:
-    breadcrumbs = [item.string.strip() for item in article.select_one('div.breadcrumbs')] 
-    breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
-    filename = breadcrumbs.pop(-1)
-    directory = '/'.join(breadcrumbs)
-    
-    print(f"Parsing {directory}/{filename}")
-
+def parse_workout(article: element.Tag, filename: str) -> Dict:
     workout_data = article.select_one('div.one-third.column.workoutlist')
     pure_workout_data = purify_workout_data(workout_data) 
 
@@ -48,11 +41,19 @@ def parse_workout(article: element.Tag) -> Dict:
     text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
     text = text.replace(xml_header, b'').strip()
     
-    return {
-        'directory': directory,
-        'filename': filename,
-        'text': text
-    }
+    return text
+
+def get_meta_data(workout: element.Tag):
+    try: 
+        breadcrumbs = [item.string.strip() for item in workout.select_one('div.breadcrumbs')] 
+    except Exception as e: 
+        #Sometimes if @ is contained in the breadcrumbs, it might be obfuscated with Cloudflare, so 
+        # it's not really possible to deobfuscate it back. This is why we just ignore it.  
+        return None, None 
+    breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
+    filename = breadcrumbs.pop(-1)
+    directory = '/'.join(breadcrumbs)
+    return directory, filename
 
 def get_workout_data(url):
     content = get_web_content(url)
@@ -61,7 +62,6 @@ def get_workout_data(url):
     return workouts
 
 def save_plan(plan_url, export_dir): 
-    print(f"Saving plan by {plan_url}")
     workouts = get_workout_data(plan_url)
     from tqdm import tqdm
 
@@ -69,11 +69,12 @@ def save_plan(plan_url, export_dir):
         save_workout(workout, export_dir)
 
 def save_workout(workout, export_dir): 
-    def unpack(directory, filename, text): return directory, filename, text
+    directory, filename = get_meta_data(workout)
+    if not directory or not filename: return #We can't really parse it, if there is some issue with the meta data
     try:
-        directory, filename, text = unpack(**parse_workout(workout))
+        text = parse_workout(workout, filename)
     except Exception as e:
-        print(f"Wasn't able to parse because of {e}")
+        print(f"Wasn't able to parse {directory}/{filename} because of {e} exception")
         return
    
     from utility import slugify
