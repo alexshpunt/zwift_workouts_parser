@@ -70,13 +70,18 @@ def save_plan(plan_url, export_dir):
 
 def save_workout(workout, export_dir): 
     def unpack(directory, filename, text): return directory, filename, text
-    directory, filename, text = unpack(**parse_workout(workout))
-    directory = f"{export_dir}/{directory}"
+    try:
+        directory, filename, text = unpack(**parse_workout(workout))
+    except Exception as e:
+        print(f"Wasn't able to parse because of {e}")
+        return
+   
+    from utility import slugify
+    directory = f"{export_dir}/{slugify(directory)}"
 
     from os import path, makedirs
     if not path.isdir(directory): makedirs(directory)
 
-    from utility import slugify
     with open(f"{directory}/{slugify(filename, True)}.zwo", 'wb') as f: 
         f.write(text)
 
@@ -88,5 +93,4 @@ def parse_plans(url, export_dir):
         sport = "".join([i for i in plan.find('div', class_='card-sports').i['class'] if 'bike' in i])
         if not sport: continue
         plan_url = plan.find('a', class_='button')['href']
-        if 'ftp-tests' in plan_url: continue
         save_plan(plan_url, export_dir)
