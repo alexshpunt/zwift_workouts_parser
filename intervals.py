@@ -1,49 +1,17 @@
 from __future__ import annotations
 import xml.etree.ElementTree as ET 
 from interfaces import *
+from parse_helper import *
 
-class ParseHelper: 
-    def parse_interval(row : str) -> ZSteadyState: 
+class ZInterval(Parsable, XMLWritable):
+    def parse(row : str) -> Parsable: 
         if 'free ride' in row: return ZFreeRide.parse(row) #10min free ride 
         if 'from' in row and 'to' in row: return ZRangedInterval.parse(row) #1min from 50 to 90% FTP
         if 'x' in row: return ZIntervalsT.parse(row) #10x 3min @ 100% FTP, 1min @ 55% FTP
         return ZSteadyState.parse(row) #3min @ 100rpmm, 95% FTP
-    
-    def parse_cadence(row: str) -> int:
-        keyword = 'rpm'
-
-        if keyword not in row: return -1, row 
-        if ',' in row: keyword += ','
-
-        cadence, rest = row.split(keyword)
-        if '/' in cadence: cadence = sum([int(c) for c in cadence.split('/')])/2 
-        return int(cadence), rest 
-
-    def parse_power(row: str) -> int:
-        power = row 
-        if '%' in power: power, _ = power.split('%')
-        if 'W' in power: power, _ = power.split('W')
-        return float(power)/100
-
-    def parse_duration(row: str) -> int: 
-        import re 
-        prog = re.compile('^\d+$')
-        seconds = 0 
-        if 'hr' in row: 
-            hr, row = row.split('hr') 
-            seconds += int(hr) * 3600 
-        if 'min' in row: 
-            min, row = row.split('min')
-            min = "".join(re.findall('\d+', min)) #Add this to all the time values
-            seconds += int(min) * 60 
-        if 'sec' in row: 
-            sec, _ = row.split('sec')
-            seconds += int(sec)
-        return seconds
 
 class ZSteadyState(Parsable, XMLWritable): 
     def parse(row : str) -> ZSteadyState:
-        print(f"Try to parse {row} as Steady State")
         duration, row = [r.strip() for r in row.split('@')]
         duration = ParseHelper.parse_duration(duration)
         cadence, row = ParseHelper.parse_cadence(row)
@@ -66,7 +34,6 @@ class ZSteadyState(Parsable, XMLWritable):
 
 class ZRangedInterval(ZSteadyState): 
     def parse(row : str) -> ZRangedInterval:                 
-        print(f"Try to parse {row} as Ranged Interval")
         duration, row = row.split('from')
         cadence = -1
         if '@' in duration: 
@@ -109,7 +76,6 @@ class ZCooldown(ZRangedInterval):
 
 class ZIntervalsT(ZSteadyState): 
     def parse(row : str) -> ZIntervalsT: 
-        print(f"Try to parse {row} as Intervals")
         number, rest =  row.split('x')
         rest = rest.replace("rpm,", 'rpm')
         first_interval, second_interval = [ZSteadyState.parse(r) for r in rest.split(',')]
@@ -136,7 +102,6 @@ class ZIntervalsT(ZSteadyState):
 
 class ZFreeRide(ZSteadyState): 
     def parse(row : str) -> ZFreeRide: 
-        print(f"Try to parse {row} as free ride")
         duration, _ = row.split('free ride')
         cadence = -1
         if '@' in duration: 

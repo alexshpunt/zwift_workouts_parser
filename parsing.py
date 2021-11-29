@@ -6,12 +6,9 @@ from typing import Dict
 def convert_to_string(data):
     output = [] 
     if isinstance(data, element.NavigableString): return data.string
-    print(f"-- {data} (type {type(data)}")
     for content in data.contents:
-        if isinstance(content, str): 
-            output.append(content)
-        else: 
-            output.extend([convert_to_string(c) for c in content.contents])
+        if isinstance(content, str): output.append(content)
+        else: output.extend([convert_to_string(c) for c in content.contents])
     return "".join(output)
 
 def purify_workout_data(data : element.Tag): 
@@ -19,12 +16,6 @@ def purify_workout_data(data : element.Tag):
     for row in data.find_all('div'):
         workout_set = [convert_to_string(c) for c in row.contents] 
         workout.append("".join(workout_set))
-#        for content in row.contents: 
-            #if isinstance(content, element.Tag): 
-                #print(f"--- {content} xxx {content.contents}")
-                #workout_set.append("".join(content.contents)) #We have an issue here, seems like because of the <br> tag  
-            #else: workout_set.append(content)
-        #workout.append("".join(workout_set))
     return workout
 
 def parse_workout(article: element.Tag, filename: str) -> Dict:
@@ -57,17 +48,15 @@ def parse_workout(article: element.Tag, filename: str) -> Dict:
     
     return text
 
-def check_sport_type(class_value):
-    return [s for s in class_value if 'bike' in s]
+def is_valid_sport_type(class_value):
+    return len([s for s in class_value if 'bike' in s]) > 0
 
 def get_meta_data(workout: element.Tag):
     invalid_meta_data = (None, None)
     breadcrumbs = workout.select_one('div.breadcrumbs')
     header = breadcrumbs.find('h4')
     sport_type = header['class']
-    print(f'sport type {sport_type}')
-    if not check_sport_type(sport_type): return invalid_meta_data 
-    print(f'--- {header}')
+    if not is_valid_sport_type(sport_type): return invalid_meta_data 
     try: 
         breadcrumbs = [item.string.strip() for item in workout.select_one('div.breadcrumbs')] 
     except Exception as e: 
@@ -95,13 +84,12 @@ def save_plan(plan_url, export_dir):
 def save_workout(workout, export_dir): 
     directory, filename = get_meta_data(workout)
     if not directory or not filename: return #We can't really parse it, if there is some issue with the meta data
-    print(directory, filename)
-    text = parse_workout(workout, filename)
-    #try:
-    #except Exception as e:
-    #    print(f"Wasn't able to parse {directory}/{filename} because of {e} exception")
-    #    return
-   
+    try:
+        text = parse_workout(workout, filename)
+    except Exception as e:
+        print(f"Skipping {directory}/{filename} because of {e}")
+        return
+    print(f'Parsed {directory}/{filename}')
     from utility import slugify
     directory = f"{export_dir}/{slugify(directory)}"
 
@@ -116,8 +104,7 @@ def parse_plans(url, export_dir):
     soup = BeautifulSoup(content, features='html.parser')
     plans = soup.find_all('div', class_ = 'card')
     for plan in plans: 
-        sport = "".join([i for i in plan.find('div', class_='card-sports').i['class'] if 'bike' in i])
-        if not sport: continue
+        card_classes = plan.find('div', class_='card-sports').i['class']
+        if not is_valid_sport_type(card_classes): continue
         plan_url = plan.find('a', class_='button')['href']
-        #if 'ftp-test' in plan_url: continue
         save_plan(plan_url, export_dir)
