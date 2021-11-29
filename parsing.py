@@ -3,23 +3,28 @@ from bs4 import BeautifulSoup, element
 from webhelper import get_web_content
 from typing import Dict
 
-def convert_to_string(data: element.NavigableString):
+def convert_to_string(data):
     output = [] 
+    if isinstance(data, element.NavigableString): return data.string
+    print(f"-- {data} (type {type(data)}")
     for content in data.contents:
         if isinstance(content, str): 
             output.append(content)
-        pass 
+        else: 
+            output.extend([convert_to_string(c) for c in content.contents])
+    return "".join(output)
 
 def purify_workout_data(data : element.Tag): 
     workout = []
     for row in data.find_all('div'):
-        workout_set = [] 
-        for content in row.contents: 
-            if isinstance(content, element.Tag): 
-                print(f"--- {content} xxx {content.contents}")
-                workout_set.append("".join(content.contents)) #We have an issue here, seems like because of the <br> tag  
-            else: workout_set.append(content)
+        workout_set = [convert_to_string(c) for c in row.contents] 
         workout.append("".join(workout_set))
+#        for content in row.contents: 
+            #if isinstance(content, element.Tag): 
+                #print(f"--- {content} xxx {content.contents}")
+                #workout_set.append("".join(content.contents)) #We have an issue here, seems like because of the <br> tag  
+            #else: workout_set.append(content)
+        #workout.append("".join(workout_set))
     return workout
 
 def parse_workout(article: element.Tag, filename: str) -> Dict:
@@ -32,11 +37,11 @@ def parse_workout(article: element.Tag, filename: str) -> Dict:
     workout_overview = article.select_one('div.overview')
     workout_author = 'Zwift Workouts Parser'
     workout_desc = workout_overview.next_sibling
-    if 'Author' in workout_overview.next_sibling.get_text():
+    if 'Author:' in workout_overview.next_sibling.get_text():
         workout_author = workout_overview.next_sibling
         workout_desc = workout_author.next_sibling
 
-    if not isinstance(workout_author, str) and 'Author' in workout_author.get_text(): 
+    if not isinstance(workout_author, str) and 'Author:' in workout_author.get_text(): 
         _, workout_author = workout_author.get_text().split('Author:')
     workout_desc = workout_desc.get_text("\n")
 
@@ -52,13 +57,23 @@ def parse_workout(article: element.Tag, filename: str) -> Dict:
     
     return text
 
+def check_sport_type(class_value):
+    return [s for s in class_value if 'bike' in s]
+
 def get_meta_data(workout: element.Tag):
+    invalid_meta_data = (None, None)
+    breadcrumbs = workout.select_one('div.breadcrumbs')
+    header = breadcrumbs.find('h4')
+    sport_type = header['class']
+    print(f'sport type {sport_type}')
+    if not check_sport_type(sport_type): return invalid_meta_data 
+    print(f'--- {header}')
     try: 
         breadcrumbs = [item.string.strip() for item in workout.select_one('div.breadcrumbs')] 
     except Exception as e: 
         #Sometimes if @ is contained in the breadcrumbs, it might be obfuscated with Cloudflare, so 
         # it's not really possible to deobfuscate it back. This is why we just ignore it.  
-        return None, None 
+        return invalid_meta_data 
     breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
     filename = breadcrumbs.pop(-1)
     directory = '/'.join(breadcrumbs)
@@ -74,12 +89,13 @@ def save_plan(plan_url, export_dir):
     workouts = get_workout_data(plan_url)
     from tqdm import tqdm
 
-    for workout in tqdm(workouts):
+    for workout in workouts:
         save_workout(workout, export_dir)
 
 def save_workout(workout, export_dir): 
     directory, filename = get_meta_data(workout)
     if not directory or not filename: return #We can't really parse it, if there is some issue with the meta data
+    print(directory, filename)
     text = parse_workout(workout, filename)
     #try:
     #except Exception as e:
@@ -103,5 +119,5 @@ def parse_plans(url, export_dir):
         sport = "".join([i for i in plan.find('div', class_='card-sports').i['class'] if 'bike' in i])
         if not sport: continue
         plan_url = plan.find('a', class_='button')['href']
-        if 'ftp-test' in plan_url: continue
+        #if 'ftp-test' in plan_url: continue
         save_plan(plan_url, export_dir)
