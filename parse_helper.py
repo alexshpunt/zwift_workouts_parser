@@ -1,15 +1,6 @@
 from __future__ import annotations
-from bs4 import BeautifulSoup, element
 
 class ParseHelper: 
-    def convert_to_string(data):
-        output = [] 
-        if isinstance(data, element.NavigableString): return data.string
-        for content in data.contents:
-            if isinstance(content, str): output.append(content)
-            else: output.extend([ParseHelper.convert_to_string(c) for c in content.contents])
-        return "".join(output)
-
     def parse_cadence(row: str) -> int:
         keyword = 'rpm'
 

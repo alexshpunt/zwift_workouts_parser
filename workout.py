@@ -1,48 +1,9 @@
 from __future__ import annotations
 import xml.etree.ElementTree as ET
-from bs4 import BeautifulSoup, element
 from interfaces import * 
 from intervals import * 
-from typing import List
 
-class ZWorkoutFile(XMLWritable, Parsable): 
-    def purify_workout_data(data : element.Tag): 
-        workout = []
-        for row in data.find_all('div'):
-            workout_set = [convert_to_string(c) for c in row.contents] 
-            workout.append("".join(workout_set))
-        return workout
-
-    def parse(article: element.Tag, filename: str) -> Parsable:
-        workout_data = article.select_one('div.one-third.column.workoutlist')
-        pure_workout_data = purify_workout_data(workout_data) 
-
-        from workout import ZWorkout, ZWorkoutFile
-        parsed_workout = ZWorkout.parse(pure_workout_data)
-
-        workout_overview = article.select_one('div.overview')
-        workout_author = 'Zwift Workouts Parser'
-        workout_desc = workout_overview.next_sibling
-        if 'Author:' in workout_overview.next_sibling.get_text():
-            workout_author = workout_overview.next_sibling
-            workout_desc = workout_author.next_sibling
-
-        if not isinstance(workout_author, str) and 'Author:' in workout_author.get_text(): 
-            _, workout_author = workout_author.get_text().split('Author:')
-        workout_desc = workout_desc.get_text("\n")
-
-        workout_file = ZWorkoutFile(parsed_workout, 
-                                    name=filename, author=workout_author.strip(), description=workout_desc) 
-
-        data = workout_file.write()
-        import xml.etree.ElementTree as ET
-        text = ET.tostring(data)
-        xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
-        text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
-        text = text.replace(xml_header, b'').strip()
-        
-        return text
-
+class ZWorkoutFile(XMLWritable): 
     def __init__(self, workout : ZWorkout, **kwargs) -> None:
         def get(key, default): return kwargs[key] if key in kwargs else default
 
