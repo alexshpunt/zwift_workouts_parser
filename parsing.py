@@ -1,41 +1,80 @@
 from __future__ import annotations
 from bs4 import BeautifulSoup, element
-from webhelper import get_web_content
+from webhelper import get_web_content, get_plans_web_content, get_workout_web_content
 from typing import Dict
 from workout import ZWorkout, ZWorkoutFile
 
-def is_valid_sport_type(class_value):
-    return len([s for s in class_value if 'bike' in s]) > 0
+class ParserSettings():
+    def is_valid_sport_type(class_value):
+        return len([s for s in class_value if 'bike' in s]) > 0
 
-def get_meta_data(workout: element.Tag):
-    invalid_meta_data = (None, None)
-    breadcrumbs = workout.select_one('div.breadcrumbs')
-    header = breadcrumbs.find('h4')
-    sport_type = header['class']
-    if not is_valid_sport_type(sport_type): return invalid_meta_data 
-    try: 
-        breadcrumbs = [item.string.strip() for item in workout.select_one('div.breadcrumbs')] 
-    except Exception as e: 
-        #Sometimes if @ is contained in the breadcrumbs, it might be obfuscated with Cloudflare, so 
-        # it's not really possible to deobfuscate it back. This is why we just ignore it.  
-        return invalid_meta_data 
-    breadcrumbs = [item for item in breadcrumbs if len(item) > 0 and item != '»' and item != 'Workouts']
-    filename = breadcrumbs.pop(-1)
-    directory = '/'.join(breadcrumbs)
-    return directory, filename
+class Workout():
+    def __init__(self, workout) -> None:
+        self.directory, self.filename = (None, None)
+        breadcrumbs = workout.select_one('div.breadcrumbs')
+        sport_type = breadcrumbs.find('h4')['class']
 
-def get_workout_data(url):
-    content = get_web_content(url)
-    soup = BeautifulSoup(content, features='html.parser')
-    workouts = soup.find_all('article', class_ = 'workout')
-    return workouts
+        self.valid = ParserSettings.is_valid_sport_type(sport_type)
+        if not self.valid: return 
+        
+        try: 
+            breadcrumbs = [item.string.strip() for item in breadcrumbs] 
+        except Exception as e: 
+            #Sometimes if @ is contained in the breadcrumbs, it might be obfuscated with Cloudflare, so 
+            # it's not really possible to deobfuscate it back. This is why we just ignore it.  
+            self.valid = False
+            return 
 
-def save_plan(plan_url, export_dir): 
-    workouts = get_workout_data(plan_url)
-    from tqdm import tqdm
+        breadcrumbs = [b for b in breadcrumbs if len(b) > 0 and b != '»' and b != 'Workouts']
+        self.filename = breadcrumbs.pop(-1)
+        self.directory = '/'.join(breadcrumbs)
 
-    for workout in workouts:
-        save_workout(workout, export_dir)
+        try:
+            self.file = ZWorkoutFile(workout)
+        except Exception as e:
+            self.exception = e 
+            self.valid = False 
+        
+    def __repr__(self) -> str:
+        return f"{self.directory}/{self.filename}" if self.valid else 'Invalid Workout'
+        
+    def save(self, export_dir):
+        if not self.valid: return 
+
+class WorkoutPlan():
+    def __init__(self, plan) -> None:
+        card_classes = plan.find('div', class_='card-sports').i['class']
+        self.valid = ParserSettings.is_valid_sport_type(card_classes) 
+        self.url = plan.find('a', class_='button')['href']
+        self.workouts = [] 
+
+        if not self.valid: return 
+
+        workouts_data = get_workout_web_content(self.url)
+        for workout in workouts_data:
+            self.workouts.append(Workout(workout))
+            
+    def save(self, export_dir):
+        for workout in self.workouts:
+            workout.save(export_dir); 
+
+class WorkoutPlansCollection():
+    def __init__(self, url) -> None:
+        self.plans = [] 
+        plans_data = get_plans_web_content(url);  
+        for data in plans_data:
+            self.plans.append(WorkoutPlan(data))
+            
+    def save(self, export_dir):
+        for plan in self.plans: 
+            plan.save(export_dir)
+
+class PlanParser():
+    pass 
+
+class WorkoutsParser():
+    pass 
+
 
 def save_workout(workout, export_dir): 
     directory, filename = get_meta_data(workout)
@@ -54,13 +93,3 @@ def save_workout(workout, export_dir):
 
     with open(f"{directory}/{slugify(filename, True)}.zwo", 'wb') as f: 
         f.write(text)
-
-def parse_plans(url, export_dir): 
-    content = get_web_content(url)
-    soup = BeautifulSoup(content, features='html.parser')
-    plans = soup.find_all('div', class_ = 'card')
-    for plan in plans: 
-        card_classes = plan.find('div', class_='card-sports').i['class']
-        if not is_valid_sport_type(card_classes): continue
-        plan_url = plan.find('a', class_='button')['href']
-        save_plan(plan_url, export_dir)

@@ -1,3 +1,5 @@
+from bs4 import BeautifulSoup
+
 def get_web_content(url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36 Vivaldi/4.3',
@@ -14,3 +16,11 @@ def get_web_content(url):
     response = urllib.request.urlopen(req, context=context)
     return response.read().decode('utf-8')
 
+def get_filtered_web_content(url, tag, tag_class):
+    content = get_web_content(url)
+
+    soup = BeautifulSoup(content, features='html.parser')
+    return soup.find_all(tag, class_ = tag_class)
+
+def get_plans_web_content(url): return get_filtered_web_content(url, 'div', 'card')
+def get_workout_web_content(url): return get_filtered_web_content(url, 'article', 'workout')
