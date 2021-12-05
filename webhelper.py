@@ -21,6 +21,3 @@ def get_filtered_web_content(url, tag, tag_class):
 
     soup = BeautifulSoup(content, features='html.parser')
     return soup.find_all(tag, class_ = tag_class)
-
-def get_plans_web_content(url): return get_filtered_web_content(url, 'div', 'card')
-def get_workout_web_content(url): return get_filtered_web_content(url, 'article', 'workout')

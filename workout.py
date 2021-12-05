@@ -5,9 +5,29 @@ from interfaces import *
 from intervals import * 
 from typing import List
 from parse_helper import ParseHelper
+from parsersettings import ParserSettings
 
 class ZWorkoutFile(XMLWritable, Parsable): 
     def __init__(self, article: element.Tag) -> None:
+        self.directory, self.filename = (None, None)
+        breadcrumbs = article.select_one('div.breadcrumbs')
+        sport_type = breadcrumbs.find('h4')['class']
+
+        self.valid = ParserSettings.is_valid_sport_type(sport_type)
+        if not self.valid: return 
+        
+        try: 
+            breadcrumbs = [item.string.strip() for item in breadcrumbs] 
+        except Exception as e: 
+            #Sometimes if @ is contained in the breadcrumbs, it might be obfuscated with Cloudflare, so 
+            # it's not really possible to deobfuscate it back. This is why we just ignore it.  
+            self.valid = False
+            return 
+
+        breadcrumbs = [b for b in breadcrumbs if len(b) > 0 and b != '»' and b != 'Workouts']
+        self.filename = breadcrumbs.pop(-1)
+        self.directory = '/'.join(breadcrumbs)
+
         self.intervals = [] 
         data = article.select_one('div.one-third.column.workoutlist')
         for div in data.find_all('div'):
@@ -34,46 +54,9 @@ class ZWorkoutFile(XMLWritable, Parsable):
             'sport_type': self.sport_type,
         }
 
-    def purify_workout_data(data : element.Tag): 
-        workout = []
-        for row in data.find_all('div'):
-            workout_set = [ParseHelper.convert_to_string(c) for c in row.contents] 
-            workout.append("".join(workout_set))
-        return workout
-
-    def parse(article: element.Tag, filename: str) -> Parsable:
-        workout_data = article.select_one('div.one-third.column.workoutlist')
-        pure_workout_data = ParseHelper.purify_workout_data(workout_data) 
-
-        from workout import ZWorkout, ZWorkoutFile
-        parsed_workout = ZWorkout.parse(pure_workout_data)
-
-        workout_overview = article.select_one('div.overview')
-        workout_author = 'Zwift Workouts Parser'
-        workout_desc = workout_overview.next_sibling
-        if 'Author:' in workout_overview.next_sibling.get_text():
-            workout_author = workout_overview.next_sibling
-            workout_desc = workout_author.next_sibling
-
-        if not isinstance(workout_author, str) and 'Author:' in workout_author.get_text(): 
-            _, workout_author = workout_author.get_text().split('Author:')
-        workout_desc = workout_desc.get_text("\n")
-
-        workout_file = ZWorkoutFile(parsed_workout, 
-                                    name=filename, author=workout_author.strip(), description=workout_desc) 
-
-        data = workout_file.write()
-        import xml.etree.ElementTree as ET
-        text = ET.tostring(data)
-        xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
-        text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
-        text = text.replace(xml_header, b'').strip()
-        
-        return text
-
     def __getitem__(self, key): return self.lookup[key]
 
-    def write(self, root : ET.Element = None) -> ET.Element:
+    def to_xml(self, root : ET.Element = None) -> ET.Element:
         root = ET.Element('workout_file')
         for k,v in self.lookup.items(): 
             ET.SubElement(root, k).text = v
@@ -82,24 +65,23 @@ class ZWorkoutFile(XMLWritable, Parsable):
             tag = ET.SubElement(tags, 'tag')
             tag.set('name', t)
 
-        self.intervals.write(root)
-        return root 
-
-class ZWorkout(Parsable, XMLWritable): 
-    def parse(rows : List[str]) -> ZWorkout: 
-        return ZWorkout([ZInterval.parse(r) for r in rows])
-
-    def __init__(self, rows: List[str]) -> None:
-        super().__init__()
-
-    def __init__(self, intervals : List[ZSteadyState]) -> None:
-        self.intervals = intervals
-        
-    def __repr__(self) -> str:
-        intervals_str = [f'{i}' for i in self.intervals]
-        return f"ZWorkout [{intervals_str}]"
-
-    def write(self, root : ET.Element) -> ET.Element: 
         workout = ET.SubElement(root, 'workout')
         for i in self.intervals: i.write(workout)
-        return workout 
+        return root 
+
+    def save(self, export_dir: str): 
+        data = self.to_xml() 
+        import xml.etree.ElementTree as ET
+        text = ET.tostring(data)
+        xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
+        text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
+        text = text.replace(xml_header, b'').strip()
+
+        from utility import slugify
+        directory = f"{export_dir}/{slugify(self.directory)}"
+
+        from os import path, makedirs
+        if not path.isdir(directory): makedirs(directory)
+
+        with open(f"{directory}/{slugify(self.filename, True)}.zwo", 'wb') as f: 
+            f.write(text)
