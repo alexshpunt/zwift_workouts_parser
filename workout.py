@@ -54,8 +54,6 @@ class ZWorkoutFile(XMLWritable, Parsable):
             'sport_type': self.sport_type,
         }
 
-    def __getitem__(self, key): return self.lookup[key]
-
     def to_xml(self, root : ET.Element = None) -> ET.Element:
         root = ET.Element('workout_file')
         for k,v in self.lookup.items(): 
@@ -70,6 +68,8 @@ class ZWorkoutFile(XMLWritable, Parsable):
         return root 
 
     def save(self, export_dir: str): 
+        if not self.valid: return
+
         data = self.to_xml() 
         import xml.etree.ElementTree as ET
         text = ET.tostring(data)
@@ -85,3 +85,5 @@ class ZWorkoutFile(XMLWritable, Parsable):
 
         with open(f"{directory}/{slugify(self.filename, True)}.zwo", 'wb') as f: 
             f.write(text)
+
+        print(f"--- Parsed workout {self.directory}/{self.filename}")

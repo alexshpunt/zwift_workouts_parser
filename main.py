@@ -9,8 +9,10 @@ if 'urls' in settings:
 
 export_dir = settings['exportDir']
 plans_url = settings['plansUrl'] 
-from parsing import parse_plans
-parse_plans(plans_url, export_dir)
+
+plans_url = "https://whatsonzwift.com/workouts/olympic-tri-prep-plan/week-1-day-2-bike"
+from zparser import Parser 
+Parser(export_dir, plans_url)
 
 import sys 
 if __name__ == '__main__': 
