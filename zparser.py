@@ -1,5 +1,4 @@
 from webhelper import get_filtered_web_content 
-from parsing import WorkoutPlan, WorkoutPlansCollection
 from parsersettings import ParserSettings
 from workout import ZWorkoutFile
 
@@ -9,16 +8,21 @@ def get_workouts_web_content(url): return get_filtered_web_content(url, 'article
 class Parser:
     def __init__(self, export_dir, *urls) -> None:
         for url in urls: 
-            parser = self.get_parser(url) 
-            if not parser: print(f"Couldn't find a parser for {url} hence skipping it.")
-            else: parser.save(export_dir) 
+            workouts = self.try_parse(url) 
+            if not workouts: 
+                print(f"Couldn't find a parser for {url} hence skipping it.")
+                continue
+            
+            for workout in workouts:
+                 workout.save(export_dir) 
     
-    def get_parser(self, url):
+    def try_parse(self, url):
         plans = self.try_parse_plans(url); 
         if plans: return plans
 
         workouts = self.try_parse_workout(url);  
         if workouts: return workouts 
+
         return None 
 
     def try_parse_plans(self, url):
@@ -36,7 +40,7 @@ class Parser:
                 return None 
 
             workouts = self.try_parse_workout(url)
-            if workouts: plans.append(workouts) 
+            if workouts: plans.extend(workouts) 
         return plans; 
 
     def try_parse_workout(self, url):
