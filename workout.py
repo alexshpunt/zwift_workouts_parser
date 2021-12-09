@@ -1,19 +1,18 @@
 from __future__ import annotations
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, element
-from interfaces import * 
 from intervals import * 
 from typing import List
-from parse_helper import ParseHelper
-from parsersettings import ParserSettings
+import helper as Helper 
+from intervals import * 
 
-class ZWorkoutFile(XMLWritable, Parsable): 
+class ZWorkoutFile(): 
     def __init__(self, article: element.Tag) -> None:
         self.directory, self.filename = (None, None)
         breadcrumbs = article.select_one('div.breadcrumbs')
         sport_type = breadcrumbs.find('h4')['class']
 
-        self.valid = ParserSettings.is_valid_sport_type(sport_type)
+        self.valid = Helper.is_valid_sport_type(sport_type)
         if not self.valid: return 
         
         try: 
@@ -31,8 +30,8 @@ class ZWorkoutFile(XMLWritable, Parsable):
         self.intervals = [] 
         data = article.select_one('div.one-third.column.workoutlist')
         for div in data.find_all('div'):
-            interval = "".join([ParseHelper.convert_to_string(c) for c in div.contents]) 
-            self.intervals.append(ZInterval.parse(interval))
+            interval = "".join([Helper.convert_to_string(c) for c in div.contents]) 
+            self.intervals.append(ZWorkoutFile.parse_interval(interval))
 
         overview = article.select_one('div.overview')
         self.author = 'Zwift Workouts Parser'
@@ -77,13 +76,18 @@ class ZWorkoutFile(XMLWritable, Parsable):
         text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
         text = text.replace(xml_header, b'').strip()
 
-        from utility import slugify
-        directory = f"{export_dir}/{slugify(self.directory)}"
+        directory = f"{export_dir}/{Helper.slugify(self.directory)}"
 
         from os import path, makedirs
         if not path.isdir(directory): makedirs(directory)
 
-        with open(f"{directory}/{slugify(self.filename, True)}.zwo", 'wb') as f: 
+        with open(f"{directory}/{Helper.slugify(self.filename, True)}.zwo", 'wb') as f: 
             f.write(text)
 
         print(f"--- Parsed workout {self.directory}/{self.filename}")
+
+    def parse_interval(row: str): 
+        if 'free ride' in row: return ZFreeRide(row) #10min free ride 
+        if 'from' in row and 'to' in row: return ZRangedInterval(row) #1min from 50 to 90% FTP
+        if 'x' in row: return ZIntervalsT(row) #10x 3min @ 100% FTP, 1min @ 55% FTP
+        return ZSteadyState(row) #3min @ 100rpmm, 95% FTP

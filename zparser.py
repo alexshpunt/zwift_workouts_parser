@@ -1,9 +1,8 @@
-from webhelper import get_filtered_web_content 
-from parsersettings import ParserSettings
+import helper as Helper
 from workout import ZWorkoutFile
 
-def get_plans_web_content(url): return get_filtered_web_content(url, 'div', 'card')
-def get_workouts_web_content(url): return get_filtered_web_content(url, 'article', 'workout')
+def get_plans_web_content(url): return Helper.get_filtered_web_content(url, 'div', 'card')
+def get_workouts_web_content(url): return Helper.get_filtered_web_content(url, 'article', 'workout')
 
 class Parser:
     def __init__(self, export_dir, *urls) -> None:
