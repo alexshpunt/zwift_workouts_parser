@@ -1,0 +1,4 @@
+TODO: Make a build and upload it as a release 
+TODO: Make an archive with all exported workouts and upload it as a release 
+TODO: Write a small wiki about how everything should be set up 
+TODO: Write doccumentation for the classes 
