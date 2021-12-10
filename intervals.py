@@ -53,7 +53,7 @@ class ZIntervalsT():
         number, rest =  row.split('x')
         rest = rest.replace("rpm,", 'rpm')
         first_interval, second_interval = [ZSteadyState(r) for r in rest.split(',')]
-        self.nubner = number 
+        self.number = number 
         self.first_interval = first_interval 
         self.second_interval = second_interval 
 

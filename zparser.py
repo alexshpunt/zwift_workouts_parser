@@ -28,7 +28,7 @@ class Parser:
             if not card_sports: return False 
 
             card_classes = card_sports.i['class']
-            valid = ParserSettings.is_valid_sport_type(card_classes) 
+            valid = Helper.is_valid_sport_type(card_classes) 
             url = plan_data.find('a', class_='button')['href']
 
             if not valid: 

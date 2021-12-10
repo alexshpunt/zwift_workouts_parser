@@ -1,19 +1,13 @@
-import json
-from xml.etree.ElementTree import parse 
-with open('settings.json') as f: 
-    settings = json.load(f)
-    
-urls = [] 
-if 'urls' in settings: 
-    urls.extend(settings['urls'])
-
-export_dir = settings['exportDir']
-plans_url = settings['plansUrl'] 
-
-plans_url = "https://whatsonzwift.com/workouts/olympic-tri-prep-plan/week-1-day-2-bike"
+import argparse  
 from zparser import Parser 
-Parser(export_dir, plans_url)
 
-import sys 
 if __name__ == '__main__': 
-    print(sys.argv)
+    parser = argparse.ArgumentParser(description="Parses Zwift workouts from www.whatsonzwift.com")
+    parser.add_argument('urls', metavar='URLs', type=str, nargs="+", help="an URL of the workout to parse")
+    parser.add_argument("--output",  nargs="?", help="output directory of the parsed workouts")
+    args = vars(parser.parse_args()) 
+    
+    if 'urls' in args and args['urls']: 
+        urls = args['urls'] 
+        export_dir = args['output'] if 'output' in args and args['output'] else 'export/'
+        Parser(export_dir, *urls)
