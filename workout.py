@@ -84,7 +84,7 @@ class ZWorkoutFile():
         with open(f"{directory}/{Helper.slugify(self.filename, True)}.zwo", 'wb') as f: 
             f.write(text)
 
-        print(f"--- Parsed workout {self.directory}/{self.filename}")
+        print(f"-- Parsed workout {self.directory}/{self.filename}")
 
     def parse_interval(row: str): 
         if 'free ride' in row: return ZFreeRide(row) #10min free ride 
