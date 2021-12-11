@@ -1,14 +1,44 @@
-from __future__ import annotations
 import xml.etree.ElementTree as ET 
-import helper as Helper
+
+def parse_cadence(row: str) -> int:
+    keyword = 'rpm'
+
+    if keyword not in row: return -1, row 
+    if ',' in row: keyword += ','
+
+    cadence, rest = row.split(keyword)
+    if '/' in cadence: cadence = sum([int(c) for c in cadence.split('/')])/2 
+    return int(cadence), rest 
+
+def parse_power(row: str) -> int:
+    power = row 
+    if '%' in power: power, _ = power.split('%')
+    if 'W' in power: power, _ = power.split('W')
+    return float(power)/100
+
+def parse_duration(row: str) -> int: 
+    import re 
+    prog = re.compile('^\d+$')
+    seconds = 0 
+    if 'hr' in row: 
+        hr, row = row.split('hr') 
+        seconds += int(hr) * 3600 
+    if 'min' in row: 
+        min, row = row.split('min')
+        min = "".join(re.findall('\d+', min)) #Add this to all the time values
+        seconds += int(min) * 60 
+    if 'sec' in row: 
+        sec, _ = row.split('sec')
+        seconds += int(sec)
+    return seconds
 
 class ZSteadyState: 
     def __init__(self, row: str) -> None:
         duration, row = [r.strip() for r in row.split('@')]
-        duration = Helper.parse_duration(duration)
-        cadence, row = Helper.parse_cadence(row)
+        duration = parse_duration(duration)
+        cadence, row = parse_cadence(row)
         self.duration = duration
-        self.power = Helper.parse_power(row)
+        self.power = parse_power(row)
         self.cadence = cadence 
 
     def __repr__(self) -> str:
@@ -27,10 +57,10 @@ class ZRangedInterval():
         cadence = -1
         if '@' in duration: 
             duration, cadence = duration.split('@')
-            cadence, _ = Helper.parse_cadence(cadence)
-        duration = Helper.parse_duration(duration)
+            cadence, _ = parse_cadence(cadence)
+        duration = parse_duration(duration)
 
-        from_power, to_power = [Helper.parse_power(p) for p in row.split('to')]
+        from_power, to_power = [parse_power(p) for p in row.split('to')]
 
         self.duration = duration 
         self.from_power = from_power 
@@ -76,8 +106,8 @@ class ZFreeRide():
         cadence = -1
         if '@' in duration: 
             duration, cadence = duration.split("@")
-            cadence = Helper.parse_cadence(cadence)
-        duration = Helper.parse_duration(duration)
+            cadence = parse_cadence(cadence)
+        duration = parse_duration(duration)
 
         self.duration = duration
         self.cadence = cadence

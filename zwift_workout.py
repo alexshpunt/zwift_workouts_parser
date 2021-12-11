@@ -1,18 +1,29 @@
-from __future__ import annotations
+from typing import List
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, element
-from intervals import * 
-from typing import List
-import helper as Helper 
-from intervals import * 
+from zwift_intervals import * 
 
-class ZWorkoutFile(): 
+class ZWorkout(): 
+    def is_valid_sport_type(class_values: List[str]):
+        """Checks if workout's sport type is supported by the parser
+
+        At the moment the parser supports only the bike workouts, 
+        so this function checks if there is a bike type in the sport 
+        types.
+
+        Parameters 
+        ----------
+        class_values : List[str]
+                    A list of the class values on the workout's html page         
+        """
+        return len([s for s in class_values if 'bike' in s]) > 0
+
     def __init__(self, article: element.Tag) -> None:
         self.directory, self.filename = (None, None)
         breadcrumbs = article.select_one('div.breadcrumbs')
         sport_type = breadcrumbs.find('h4')['class']
 
-        self.valid = Helper.is_valid_sport_type(sport_type)
+        self.valid = ZWorkout.is_valid_sport_type(sport_type)
         if not self.valid: return 
         
         try: 
@@ -27,11 +38,19 @@ class ZWorkoutFile():
         self.filename = breadcrumbs.pop(-1)
         self.directory = '/'.join(breadcrumbs)
 
+        def convert_to_string(data):
+            output = [] 
+            if isinstance(data, element.NavigableString): return data.string
+            for content in data.contents:
+                if isinstance(content, str): output.append(content)
+                else: output.extend([convert_to_string(c) for c in content.contents])
+            return "".join(output)
+
         self.intervals = [] 
         data = article.select_one('div.one-third.column.workoutlist')
         for div in data.find_all('div'):
-            interval = "".join([Helper.convert_to_string(c) for c in div.contents]) 
-            self.intervals.append(ZWorkoutFile.parse_interval(interval))
+            interval = "".join([convert_to_string(c) for c in div.contents]) 
+            self.intervals.append(ZWorkout.parse_interval(interval))
 
         overview = article.select_one('div.overview')
         self.author = 'Zwift Workouts Parser'
@@ -76,12 +95,12 @@ class ZWorkoutFile():
         text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
         text = text.replace(xml_header, b'').strip()
 
-        directory = f"{export_dir}/{Helper.slugify(self.directory)}"
+        directory = f"{export_dir}/{slugify(self.directory)}"
 
         from os import path, makedirs
         if not path.isdir(directory): makedirs(directory)
 
-        with open(f"{directory}/{Helper.slugify(self.filename, True)}.zwo", 'wb') as f: 
+        with open(f"{directory}/{slugify(self.filename, True)}.zwo", 'wb') as f: 
             f.write(text)
 
         print(f"-- Parsed workout {self.directory}/{self.filename}")
@@ -91,3 +110,21 @@ class ZWorkoutFile():
         if 'from' in row and 'to' in row: return ZRangedInterval(row) #1min from 50 to 90% FTP
         if 'x' in row: return ZIntervalsT(row) #10x 3min @ 100% FTP, 1min @ 55% FTP
         return ZSteadyState(row) #3min @ 100rpmm, 95% FTP
+
+import unicodedata
+import re
+def slugify(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')
