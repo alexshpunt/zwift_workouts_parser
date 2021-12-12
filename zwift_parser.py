@@ -87,7 +87,9 @@ import argparse
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser(description="Parses Zwift workouts from www.whatsonzwift.com")
     parser.add_argument('urls', metavar='URLs', type=str, nargs="+", help="an URL of the workout to parse")
-    parser.add_argument("--output",  nargs="?", help="output directory of the parsed workouts")
+    parser.add_argument('-o', '--output',  nargs="?", help="output directory of the parsed workouts")
+    parser.add_argument('-sd', '--skip-d', help='skips workouts which can be downloaded from the site')
+    parser.add_argument('-rd', '--replace-d', help='replaces workouts which can be downloaded from the site with their uploaded files')
     args = vars(parser.parse_args()) 
     
     if 'urls' in args and args['urls']: 

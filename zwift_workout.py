@@ -59,6 +59,10 @@ class ZWorkout():
         self.filename = breadcrumbs.pop(-1)
         self.directory = '/'.join(breadcrumbs)
 
+        download_button = [a for a in article.find_all('a') if a.string and 'Download workout' in a.string]
+        self.download_link = download_button[0]['href'] if download_button else None
+        print(download_button, self.download_link)
+
         def convert_to_string(data):
             output = [] 
             if isinstance(data, element.NavigableString): return data.string
