@@ -1,6 +1,8 @@
 import xml.etree.ElementTree as ET 
 
 def parse_cadence(row: str) -> int:
+    """Parses cadence value string 'Xrpm' and returns X as int"""
+
     keyword = 'rpm'
 
     if keyword not in row: return -1, row 
@@ -11,25 +13,28 @@ def parse_cadence(row: str) -> int:
     return int(cadence), rest 
 
 def parse_power(row: str) -> int:
+    """Parses power value string 'X%' or 'XW' and returns X as int"""
+
     power = row 
     if '%' in power: power, _ = power.split('%')
     if 'W' in power: power, _ = power.split('W')
     return float(power)/100
 
 def parse_duration(row: str) -> int: 
+    """Parses duration value string 'Xhr', 'Ymin' or 'Zsec' and returns (X::Y::Z) as seconds"""
+
     import re 
-    prog = re.compile('^\d+$')
+    def filter_digits(s): return "".join(re.findall('\d+', s))
     seconds = 0 
     if 'hr' in row: 
-        hr, row = row.split('hr') 
-        seconds += int(hr) * 3600 
+        hr, row = row.split('hr')
+        seconds += int(filter_digits(hr)) * 3600 
     if 'min' in row: 
         min, row = row.split('min')
-        min = "".join(re.findall('\d+', min)) #Add this to all the time values
-        seconds += int(min) * 60 
+        seconds += int(filter_digits(min)) * 60 
     if 'sec' in row: 
         sec, _ = row.split('sec')
-        seconds += int(sec)
+        seconds += int(filter_digits(sec))
     return seconds
 
 class ZSteadyState: 
@@ -44,7 +49,13 @@ class ZSteadyState:
     def __repr__(self) -> str:
         return f'SteadyState (duration: {self.duration} power: {self.power} cadence: {self.cadence}'
 
-    def write(self, root: ET.Element) -> ET.Element:
+    def to_xml(self, root: ET.Element) -> ET.Element:
+        """Creates an XML element from the steady state interval data 
+
+        Params
+        root : ET.Element 
+                Root of the created steady state interval XML element 
+        """
         interval = ET.SubElement(root, 'SteadyState')
         interval.set('Duration', str(self.duration))
         interval.set('Power', str(self.power))
@@ -71,7 +82,13 @@ class ZRangedInterval():
     def __repr__(self) -> str:
         return f'{self.get_name()} (duration: {self.duration} from_power: {self.from_power} to_power: {self.to_power} cadence: {self.cadence})'
 
-    def write(self, root: ET.Element) -> ET.Element:
+    def to_xml(self, root: ET.Element) -> ET.Element:
+        """Creates an XML element from the ranged interval interval data 
+
+        Params
+        root : ET.Element 
+                Root of the created free ranged interval XML element 
+        """
         interval = ET.SubElement(root, self.name)
         interval.set('Duration', str(self.duration))
         interval.set('PowerLow', str(self.from_power))
@@ -90,7 +107,13 @@ class ZIntervalsT():
     def __repr__(self) -> str:
         return f'IntervalT ({self.number} x {self.first_interval}, {self.second_interval})'
 
-    def write(self, root: ET.Element) -> ET.Element:
+    def to_xml(self, root: ET.Element) -> ET.Element:
+        """Creates an XML element from the intervals data 
+
+        Params
+        root : ET.Element 
+                Root of the created free ride intervals XML element 
+        """
         interval = ET.SubElement(root, 'IntervalsT')
         interval.set('Repeat', str(self.number))
         interval.set('OnDuration', str(self.first_interval.duration))
@@ -116,7 +139,13 @@ class ZFreeRide():
     def __repr__(self) -> str:
         return f'ZFreeRide (duration: {self.duration} cadence: {self.cadence})'
 
-    def write(self, root: ET.Element) -> ET.Element:
+    def to_xml(self, root: ET.Element) -> ET.Element:
+        """Creates an XML element from the free ride interval data 
+
+        Params
+        root : ET.Element 
+                Root of the created free ride interval XML element 
+        """
         interval = ET.SubElement(root, 'FreeRide')
         interval.set('Duration', str(self.duration))
         interval.set('FlatRoad', str(self.flat_road))
