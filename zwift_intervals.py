@@ -80,7 +80,7 @@ class ZRangedInterval():
         self.name = "Warmup" if from_power < to_power else "Cooldown"  
 
     def __repr__(self) -> str:
-        return f'{self.get_name()} (duration: {self.duration} from_power: {self.from_power} to_power: {self.to_power} cadence: {self.cadence})'
+        return f'{self.name} (duration: {self.duration} from_power: {self.from_power} to_power: {self.to_power} cadence: {self.cadence})'
 
     def to_xml(self, root: ET.Element) -> ET.Element:
         """Creates an XML element from the ranged interval interval data 

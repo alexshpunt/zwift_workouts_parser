@@ -2,6 +2,12 @@ from typing import List
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, element
 from zwift_intervals import * 
+from enum import Enum 
+
+class ZWorkoutParseMode: 
+    DEFAULT = 1
+    SKIP = 2 
+    REPLACE = 3 
 
 class ZWorkout(): 
     def is_valid_sport_type(class_values: List[str]):
@@ -39,8 +45,9 @@ class ZWorkout():
         if 'x' in raw_str: return ZIntervalsT(raw_str) #10x 3min @ 100% FTP, 1min @ 55% FTP
         return ZSteadyState(raw_str) #3min @ 100rpmm, 95% FTP
 
-    def __init__(self, article: element.Tag) -> None:
-        self.directory, self.filename = (None, None)
+    def __init__(self, article: element.Tag, mode: ZWorkoutParseMode = ZWorkoutParseMode.DEFAULT) -> None:
+        self.path, self.filename = (None, None)
+        self.mode = mode
         breadcrumbs = article.select_one('div.breadcrumbs')
         sport_type = breadcrumbs.find('h4')['class']
 
@@ -55,27 +62,26 @@ class ZWorkout():
             self.valid = False
             return 
 
-        breadcrumbs = [b for b in breadcrumbs if len(b) > 0 and b != '»' and b != 'Workouts']
+        breadcrumbs = [slugify(b) for b in breadcrumbs if len(b) > 0 and b != '»' and b != 'Workouts']
         self.filename = breadcrumbs.pop(-1)
-        self.directory = '/'.join(breadcrumbs)
+        self.path = '/'.join(breadcrumbs)
+        self.intervals = [] 
 
         download_button = [a for a in article.find_all('a') if a.string and 'Download workout' in a.string]
-        self.download_link = download_button[0]['href'] if download_button else None
-        print(download_button, self.download_link)
+        self.download_link = download_button[0]['href'] if download_button and self.mode is not ZWorkoutParseMode.DEFAULT else None
+        if not self.download_link: 
+            def convert_to_string(data):
+                output = [] 
+                if isinstance(data, element.NavigableString): return data.string
+                for content in data.contents:
+                    if isinstance(content, str): output.append(content)
+                    else: output.extend([convert_to_string(c) for c in content.contents])
+                return "".join(output)
 
-        def convert_to_string(data):
-            output = [] 
-            if isinstance(data, element.NavigableString): return data.string
-            for content in data.contents:
-                if isinstance(content, str): output.append(content)
-                else: output.extend([convert_to_string(c) for c in content.contents])
-            return "".join(output)
-
-        self.intervals = [] 
-        data = article.select_one('div.one-third.column.workoutlist')
-        for div in data.find_all('div'):
-            interval = "".join([convert_to_string(c) for c in div.contents]) 
-            self.intervals.append(ZWorkout.parse_interval(interval))
+            data = article.select_one('div.one-third.column.workoutlist')
+            for div in data.find_all('div'):
+                interval = "".join([convert_to_string(c) for c in div.contents]) 
+                self.intervals.append(ZWorkout.parse_interval(interval))
 
         overview = article.select_one('div.overview')
         self.author = 'Zwift Workouts Parser'
@@ -107,14 +113,24 @@ class ZWorkout():
         """
         if not self.valid: return
 
-        data = self.to_xml() 
-        import xml.etree.ElementTree as ET
-        text = ET.tostring(data)
-        xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
-        text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
-        text = text.replace(xml_header, b'').strip()
+        workout_fullname = f"{self.path}/{self.filename}"
+        text = ""
+        if not self.download_link:
+            data = self.to_xml() 
+            import xml.etree.ElementTree as ET
+            text = ET.tostring(data)
+            xml_header = b'<?xml version="1.0" encoding="utf-8"?>'
+            text = BeautifulSoup(text, 'xml').prettify().encode('utf-8')
+            text = text.replace(xml_header, b'').strip()
+        elif self.mode is ZWorkoutParseMode.REPLACE:
+            import requests 
+            url = f"https://whatsonzwift.com{self.download_link}"
+            text = requests.get(url, allow_redirects=True).content
+        else: 
+            print(f"-- Skipped workout {workout_fullname}")
+            return 
 
-        directory = f"{export_dir}/{slugify(self.directory)}"
+        directory = f"{export_dir}/{self.path}"
 
         from os import path, makedirs
         if not path.isdir(directory): makedirs(directory)
@@ -122,7 +138,8 @@ class ZWorkout():
         with open(f"{directory}/{slugify(self.filename, True)}.zwo", 'wb') as f: 
             f.write(text)
 
-        print(f"-- Parsed workout {self.directory}/{self.filename}")
+        file_version = "Original" if self.download_link else "Parsed"
+        print(f"-- Parsed workout {workout_fullname} ({file_version})")
 
     def to_xml(self, root : ET.Element = None) -> ET.Element:
         """Creates an XML element from the workout data 
@@ -158,5 +175,5 @@ def slugify(value, allow_unicode=False):
         value = unicodedata.normalize('NFKC', value)
     else:
         value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
-    value = re.sub(r'[^\w\s-]', '', value.lower())
+    value = re.sub(r'[^\w\s-]', '', value)
     return re.sub(r'[-\s]+', '-', value).strip('-_')

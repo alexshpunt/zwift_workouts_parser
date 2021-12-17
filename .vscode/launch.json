@@ -8,8 +8,9 @@
             "name": "Python: Main File",
             "type": "python",
             "request": "launch",
-            "program": "main.py",
-            "console": "integratedTerminal"
+            "program": "zwift_parser.py",
+            "console": "integratedTerminal",
+            "args": ["https://whatsonzwift.com/workouts",]
         }
     ]
 }

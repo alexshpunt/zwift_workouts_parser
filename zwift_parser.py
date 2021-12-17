@@ -1,4 +1,5 @@
-from zwift_workout import ZWorkout
+from os import replace
+from zwift_workout import ZWorkout, ZWorkoutParseMode
 
 class Parser:
     """
@@ -6,7 +7,7 @@ class Parser:
     www.whatsonzwift.com
     """
 
-    def __init__(self, export_dir, *urls) -> None:
+    def __init__(self, export_dir, urls, skip: bool = False, replace: bool = False) -> None:
         """
         Parameters 
         ----------
@@ -16,8 +17,17 @@ class Parser:
                 A list of urls that need to be parsed, can be either a 
                 direct link to a single workout, plan or a page which 
                 contains multiple plans/workouts. 
+        skip : Bool 
+                Should the workouts that can be downloaded be skipped by
+                the parser? 
+        replace : Bool 
+                Should the workouts that can be downloaded be replaced with
+                the files uploaded to the site? 
         """
+
         self.export_dir = export_dir
+        self.skip = skip 
+        self.replace = replace 
         for i, url in enumerate(urls): 
             print(f'Parsing url {url} ({i+1}/{len(urls)})')
             parsed = self.__try_parse(url) 
@@ -55,12 +65,17 @@ class Parser:
     def __try_parse_workout(self, url):
         workouts_data = Parser.__get_web_content(url, 'article', 'workout')
         if not workouts_data: 
-            print(f"Coulnd't get workout data by {url} for unknown reason.")
+            print(f"Couldn't get workout data by {url} for unknown reason.")
             return False 
 
         for i, workout_data in enumerate(workouts_data): 
             print(f"- Parsing workout ({i+1}/{len(workouts_data)})")
-            ZWorkout(workout_data).save(self.export_dir)
+
+            mode = ZWorkoutParseMode.DEFAULT
+            if self.skip: mode = ZWorkoutParseMode.SKIP
+            elif self.replace: mode = ZWorkoutParseMode.REPLACE
+            ZWorkout(workout_data, mode).save(self.export_dir)
+
         return True 
 
     def __get_web_content(url, tag, tag_class):
@@ -86,13 +101,10 @@ class Parser:
 import argparse  
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser(description="Parses Zwift workouts from www.whatsonzwift.com")
+    parser.add_argument('--skip', action='store_true', help='skips workouts which can be downloaded from the site')
+    parser.add_argument('--replace', action='store_false', help='replaces workouts which can be downloaded from the site with their uploaded files')
     parser.add_argument('urls', metavar='URLs', type=str, nargs="+", help="an URL of the workout to parse")
-    parser.add_argument('-o', '--output',  nargs="?", help="output directory of the parsed workouts")
-    parser.add_argument('-sd', '--skip-d', help='skips workouts which can be downloaded from the site')
-    parser.add_argument('-rd', '--replace-d', help='replaces workouts which can be downloaded from the site with their uploaded files')
-    args = vars(parser.parse_args()) 
-    
-    if 'urls' in args and args['urls']: 
-        urls = args['urls'] 
-        export_dir = args['output'] if 'output' in args and args['output'] else 'export/'
-        Parser(export_dir, *urls)
+    parser.add_argument('-ed', '--export_dir',  nargs="?", default='export', help="output directory of the parsed workouts")
+
+    args = parser.parse_args() 
+    if args.urls: Parser(**vars(args))
