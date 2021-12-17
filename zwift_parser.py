@@ -75,7 +75,6 @@ class Parser:
             if self.skip: mode = ZWorkoutParseMode.SKIP
             elif self.replace: mode = ZWorkoutParseMode.REPLACE
             ZWorkout(workout_data, mode).save(self.export_dir)
-
         return True 
 
     def __get_web_content(url, tag, tag_class):
