@@ -1,3 +1,1 @@
-TODO: Make an archive with all exported workouts and upload it as a release 
 TODO: Write a small wiki about how everything should be set up 
-TODO: Add a way to download only the workouts which don't have the 'Download' button
