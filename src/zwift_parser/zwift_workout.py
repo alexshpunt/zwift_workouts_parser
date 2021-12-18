@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup, element
 from zwift_intervals import * 
 from enum import Enum 
 
-class ZWorkoutParseMode: 
+class ZWorkoutParseMode(Enum): 
     DEFAULT = 1
     SKIP = 2 
     REPLACE = 3 

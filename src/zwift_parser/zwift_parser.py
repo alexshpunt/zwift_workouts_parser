@@ -1,4 +1,3 @@
-from os import replace
 from zwift_workout import ZWorkout, ZWorkoutParseMode
 
 class Parser:
