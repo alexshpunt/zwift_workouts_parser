@@ -1,5 +1,6 @@
 Zwift Workouts Parser 
 ---------------------
+![Logo](https://github.com/alexshpunt/zwift_workouts_parser/blob/main/.github/logo.jpg?raw=true)
 
 Want to try a workout of some specific plan on Zwift but don't want to start the plan? Use this utility to parse any desired plan or workout straight from the https://whatsonzwift.com. 
 
