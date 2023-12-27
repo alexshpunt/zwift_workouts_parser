@@ -61,6 +61,6 @@ python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.c
 
 Once everything is downloaded, you can now put your selected workouts to Zwift workouts folder, usually it's located by this path:
 
-C:\Users\%USERNAME%\Documents\Zwift\Workouts\%SOME_ARBITRARY_NUMBER%`.
+`C:\Users\%USERNAME%\Documents\Zwift\Workouts\%SOME_ARBITRARY_NUMBER%`.
 
 Hopefully you will find this utility useful! 
