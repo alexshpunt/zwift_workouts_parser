@@ -15,38 +15,52 @@ Powershell [Microsoft's Guide](https://learn.microsoft.com/en-us/powershell/scri
 
 Installation
 ------------
-`python3 -m pip install --upgrade pip`
+```
+python3 -m pip install --upgrade pip
+```
 
-`pip install zwift-workouts-parser`
+```
+pip install zwift-workouts-parser
+```
 
 Usage 
 ------------
 Launch Powershell and execute this command: 
 
-`$zwift_workouts_parser = $(python3 -c "import zwift_parser as _; print (' '.join(_.__path__) + '\zwift_parser.py')")`
+```
+$zwift_workouts_parser = $(python3 -c "import zwift_parser as _; print (' '.join(_.__path__) + '\zwift_parser.py')")
+```
 
 Then we need to set our destination folder, where all the workouts will be stored: 
 
-`$zwift_workouts_folder = "C:\Users\%USERNAME%\Downloads\ZwiftWorkouts"`
+```
+$zwift_workouts_folder = "C:\Users\%USERNAME%\Downloads\ZwiftWorkouts"
+```
 
 But you can choose any arbitrary path for that. 
 
 Once it's done, you are ready to download the workouts, copy this command to the Powershell window, but don't execute it yet!
 
-`python3 $zwift_workouts_parser -ed $zwift_workouts_folder `
+```
+python3 $zwift_workouts_parser -ed $zwift_workouts_folder
+```
 
 Now you can specify all the workout urls you would like to download, separated by a space. 
 
 So this what it looks like for a single workout: 
 
-`python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder`
+```
+python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder`
+```
 
 And for multiple workouts: 
 
-`python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder https://whatsonzwift.com/workouts/30-60-minutes-to-burn https://whatsonzwift.com/workouts/climbing`
+```
+python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder https://whatsonzwift.com/workouts/30-60-minutes-to-burn https://whatsonzwift.com/workouts/climbing`
+```
 
 Once everything is downloaded, you can now put your selected workouts to Zwift workouts folder, usually it's located by this path:
 
-`C:\Users\%USERNAME%\Documents\Zwift\Workouts\%SOME_ARBITRARY_NUMBER%`.
+C:\Users\%USERNAME%\Documents\Zwift\Workouts\%SOME_ARBITRARY_NUMBER%`.
 
 Hopefully you will find this utility useful! 
