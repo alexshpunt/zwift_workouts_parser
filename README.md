@@ -36,6 +36,7 @@ Then we need to set our destination folder, where all the workouts will be store
 ```
 $zwift_workouts_folder = "C:\Users\%USERNAME%\Downloads\ZwiftWorkouts"
 ```
+Important! Replace %USERNAME% with the user name of your PC, or simply copy-paste which you want to use. 
 
 But you can choose any arbitrary path for that. 
 
@@ -50,13 +51,13 @@ Now you can specify all the workout urls you would like to download, separated b
 So this what it looks like for a single workout: 
 
 ```
-python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder`
+python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder
 ```
 
 And for multiple workouts: 
 
 ```
-python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder https://whatsonzwift.com/workouts/30-60-minutes-to-burn https://whatsonzwift.com/workouts/climbing`
+python3 $zwift_workouts_parser -ed $zwift_workouts_folder https://whatsonzwift.com/workouts/gravel-grinder https://whatsonzwift.com/workouts/30-60-minutes-to-burn https://whatsonzwift.com/workouts/climbing
 ```
 
 Once everything is downloaded, you can now put your selected workouts to Zwift workouts folder, usually it's located by this path:
