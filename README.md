@@ -36,7 +36,7 @@ Then we need to set our destination folder, where all the workouts will be store
 ```
 $zwift_workouts_folder = "C:\Users\%USERNAME%\Downloads\ZwiftWorkouts"
 ```
-Important! Replace %USERNAME% with the user name of your PC, or simply copy-paste which you want to use. 
+Important! Replace `%USERNAME%` with the user name of your PC, or simply copy-paste which you want to use. 
 
 But you can choose any arbitrary path for that. 
 
